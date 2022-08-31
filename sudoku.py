@@ -18,7 +18,13 @@ class History:
             reprstr += str(i)
         return reprstr
 
+# TODO fix problems with multiple digits for Sudoku(4) and beyond
+# for reading, writing and displaying grids
+
+# TODO check for symmetries
+
 class Sudoku:
+    
     def __init__(self, n=3):
         self.tot_size = n**4
         self.max_num = n**2
@@ -59,8 +65,9 @@ class Sudoku:
                 break
         self.visited = []
         self.stuck = False
-        
+            
     def generate_full_grid(self):
+        # TODO not super satisfying, can I do better ?
         # reset grid
         self.reset_grid()
         
