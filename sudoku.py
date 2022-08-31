@@ -19,10 +19,12 @@ class History:
         return reprstr
 
 class Sudoku:
-
-    def __init__(self):
+    def __init__(self, n=3):
+        self.tot_size = n**4
+        self.max_num = n**2
+        self.n = n
         self.grid = []
-        for i in range(0,81):
+        for i in range(0,self.tot_size):
             self.grid.append(0)
         self.visited = []
         self.stuck = False
@@ -31,7 +33,7 @@ class Sudoku:
     def reset_grid(self):
         self.visited = []
         self.stuck = False
-        for i in range(0,81):
+        for i in range(0,self.tot_size):
             self.grid[i] = 0
         self.history = History(self.grid)
         
@@ -51,7 +53,6 @@ class Sudoku:
                     not_prunable.add(idx)
                     self.grid = previous_grid
                     self.grid[idx] = prev_num
-                    
                 self.grid = previous_grid
                 self.history = History(self.grid)
             else:
@@ -98,7 +99,7 @@ class Sudoku:
                 else:
                     self.grid[counter] = int(n)
                 counter = counter+1
-            if counter != 81:
+            if counter != self.tot_size:
                 raise RuntimeError('wrong grid format')
             else:
                 if not self.is_valid():
@@ -174,12 +175,12 @@ class Sudoku:
             return False
                     
     def get_most_constrained(self):
-        least_num_choice = 10
+        least_num_choice = self.max_num+1
         r_sel = 0
         c_sel = 0
         candidates_sel = []
-        for r in range(0,9):
-            for c in range(0,9):
+        for r in range(0,self.max_num):
+            for c in range(0,self.max_num):
                 candidates = self.get_uniq_candidate(r,c)
                 num_choice = len(candidates)
                 if num_choice > 0 and num_choice < least_num_choice:
@@ -191,7 +192,7 @@ class Sudoku:
         return (r_sel,c_sel,candidates_sel)
             
     def cmp_grid(self, grid):
-        for i in range(0,81):
+        for i in range(0,self.tot_size):
             if self.grid[i] != grid[i]:
                 return False
         return True 
@@ -232,7 +233,7 @@ class Sudoku:
             col = self.get_col(c)
             sqr = self.get_square(r,c)
             not_candidate = set(row+col+sqr)
-            possible = {i for i in range(1,10)}
+            possible = {i for i in range(1,self.max_num+1)}
             candidate = list(possible - not_candidate)
             if len(candidate)==0:
                 self.stuck = True
@@ -241,22 +242,24 @@ class Sudoku:
             return []
     
     def ind2sub(self,i):
-        row = i//9
-        col = i%9
+        row = i//self.max_num
+        col = i%self.max_num
         return (row,col)
         
     def sub2ind(self,r,c):
-        lin = 9*r+c
+        lin = self.max_num*r+c
         return lin
     
     def row_ind(self,r):
-        return [i for i in range(0,81) if i//9==r]
+        return [i for i in range(0,self.tot_size) if i//self.max_num==r]
     
     def col_ind(self,c):
-        return [i for i in range(0,81) if i%9==c]
+        return [i for i in range(0,self.tot_size) if i%self.max_num==c]
     
     def sqr_ind(self,r,c):
-        return [i for i in range(0,81) if (i//9)//3==r//3 and (i%9)//3==c//3]
+        return [i for i in range(0,self.tot_size) 
+            if (i//self.max_num)//self.n==r//self.n 
+            and (i%self.max_num)//self.n==c//self.n]
         
     def get_row(self,r):
         return [self.grid[i] for i in self.row_ind(r)]
@@ -275,52 +278,43 @@ class Sudoku:
         else:
             return True
         
-    def is_valid(self):
-        """check that the grid is valid"""
-       
+    def valid(self):
         # check rows
-        for r in range(0,9):
+        for r in range(0,self.max_num):
             numbers = self.get_row(r)
             if not self.valid_subset(numbers):
                 return False
-        
         # check columns
-        for c in range(0,9):
+        for c in range(0,self.max_num):
             numbers = self.get_col(c)
             if not self.valid_subset(numbers):
                 return False
-        
         # check squares
-        for r in range(0,9,3):
-            for c in range(0,9,3):
+        for r in range(0,self.max_num,self.n):
+            for c in range(0,self.max_num,self.n):
                 numbers = self.get_square(r,c)
                 if not self.valid_subset(numbers):
                     return False
-        
         return True
         
-    def grid_string(self):
+    def __repr__(self):
         gridstr = "\n"
-        for r in range(0,9):
-            for c in range(0,9):
+        for r in range(0,self.max_num):
+            for c in range(0,self.max_num):
                 idx  = self.sub2ind(r,c)
+                if c == 0:
+                    gridstr = gridstr + " "
                 if self.grid[idx] == 0:
                     gridstr = gridstr + "  "
                 else:
                     gridstr = gridstr + str(self.grid[idx]) + " "
-                if c == 2 or c == 5:
-                    gridstr = gridstr + "| "
-                if c == 8:
-                    gridstr = gridstr + "\n"
-                    if r == 2 or r == 5:
-                        gridstr = gridstr + 21*"-" +  "\n"
+                if (c+1)//self.n > c//self.n:
+                    if c == self.max_num-1:
+                        gridstr = gridstr + " \n"
+                        if (r+1)//self.n > r//self.n:
+                            if r != self.max_num-1:
+                                gridstr=gridstr+(self.n*(self.n+1)*2-1)*"-"+"\n"
+                    else:
+                        gridstr = gridstr + "| "
         return gridstr
-        
-    def print_grid(self):
-        print(self.grid_string())
-        
-    def __repr__(self):
-        repr_str = "Grid: \n" + self.grid_string()
-        return repr_str
-
 
