@@ -65,6 +65,69 @@ class Sudoku:
                 break
         self.visited = []
         self.stuck = False
+
+    def export_grid(self,filename):
+        """export grid as svg""" 
+        svgstring = "<svg height='90' width='90'>\n"
+        
+        # add background
+        svgstring += "<rect width='100%' height='100%' fill='white'/>\n"
+        
+        # add nums
+        for r in range(0,9):
+            for c in range(0,9):
+                idx = self.sub2ind(r,c)
+                num = self.grid[idx]
+                #TODO fontsize
+                posx = c*10+2
+                posy = r*10+9
+                if num > 0:
+                    svgstring += "<text" 
+                    svgstring += " x='" + str(posx) +"'"
+                    svgstring += " y='" + str(posy) +"'>"
+                    svgstring += str(num)
+                    svgstring += " font-size=''"
+                    svgstring += "</text>\n"
+        
+        # add rows
+        for r in range(0,10):
+            x1 = 0
+            y1 = r*10
+            x2 = 90
+            y2 = r*10
+            if r == 3 or r == 6:
+                lw = 1
+            else:
+                lw = .5
+            svgstring += "<line"
+            svgstring += " x1='" + str(x1) + "'"
+            svgstring += " y1='" + str(y1) + "'"
+            svgstring += " x2='" + str(x2) + "'"
+            svgstring += " y2='" + str(y2) + "'"
+            svgstring += " style='stroke:rgb(0,0,0);stroke-width:" + str(lw) + "'" 
+            svgstring += "/>\n"
+        
+        # add columns    
+        for c in range(0,10):
+            x1 = c*10
+            y1 = 0
+            x2 = c*10
+            y2 = 90
+            if c == 3 or c == 6:
+                lw = 1
+            else:
+                lw = .5
+            svgstring += "<line"
+            svgstring += " x1='" + str(x1) + "'"
+            svgstring += " y1='" + str(y1) + "'"
+            svgstring += " x2='" + str(x2) + "'"
+            svgstring += " y2='" + str(y2) + "'"
+            svgstring += " style='stroke:rgb(0,0,0);stroke-width:" + str(lw) + "'" 
+            svgstring += "/>\n"
+                    
+        svgstring = svgstring + "</svg>"
+        with open(filename,'w') as fout:
+            fout.write(svgstring)
             
     def generate_full_grid(self):
         # TODO not super satisfying, can I do better ?
