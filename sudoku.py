@@ -125,8 +125,7 @@ class Sudoku:
                     fout.write(num)
         
     def complete(self):
-        notdone = [x for x in self.grid if x==0]
-        if len(notdone)>0:
+        if 0 in self.grid:
             return False
         else:
             return True
