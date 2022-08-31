@@ -1,4 +1,22 @@
+#ref https://en.wikipedia.org/wiki/Mathematics_of_Sudoku
+#ref https://en.wikipedia.org/wiki/Sudoku_solving_algorithms
+
 import random
+
+class History:
+    '''Simple tree class'''
+    def __init__(self, grid):
+        self.children = []
+        self.grid = grid
+    
+    def add_child(self, node):
+        self.children.append(node)
+    
+    def __repr__(self):
+        reprstr = ""
+        for i in self.grid:
+            reprstr += str(i)
+        return reprstr
 
 class Sudoku:
 
@@ -6,21 +24,17 @@ class Sudoku:
         self.grid = []
         for i in range(0,81):
             self.grid.append(0)
-        self.history = []
-        self.track = []
-        self.unique = True
-        self.num_backtrack = 0
+        self.visited = []
         self.stuck = False
+        self.history = History(self.grid)
         
     def reset_grid(self):
-        self.history = []
-        self.track = []
-        self.num_backtrack = 0
-        self.unique = True
+        self.visited = []
         self.stuck = False
         for i in range(0,81):
             self.grid[i] = 0
-            
+        self.history = History(self.grid)
+        
     def prune_grid(self): 
         solution = self.grid[:]
         not_prunable = set()
@@ -31,18 +45,18 @@ class Sudoku:
                 prev_num = self.grid[idx]
                 self.grid[idx] = 0
                 previous_grid = self.grid[:]
-                self.solve_backtrack()
-                if not self.complete() or not self.cmp_grid(solution):
+                self.history = History(self.grid)
+                valid = self.solve() 
+                if not valid or not self.cmp_grid(solution):
                     not_prunable.add(idx)
                     self.grid = previous_grid
                     self.grid[idx] = prev_num
+                    
                 self.grid = previous_grid
+                self.history = History(self.grid)
             else:
                 break
-        self.history = []
-        self.track = []
-        self.unique = True
-        self.num_backtrack = 0
+        self.visited = []
         self.stuck = False
         
     def generate_full_grid(self):
@@ -51,26 +65,20 @@ class Sudoku:
         
         while not self.complete():
             # select most constrained cell
-            (r_sel,c_sel) = self.get_most_constrained()
+            (r_sel,c_sel,candidates_sel) = self.get_most_constrained()
         
             if self.stuck:
                  self.reset_grid()
-                 (r_sel,c_sel) = self.get_most_constrained()
+                 (r_sel,c_sel,candidates_sel) = self.get_most_constrained()
                  
             # pick at random among candidates
-            candidates_sel = self.get_uniq_candidate(r_sel,c_sel)
             num = random.sample(candidates_sel,1)[0]
-            self.add_num(r_sel,c_sel,num,False)
+            idx = self.sub2ind(r_sel,c_sel)
+            self.grid[idx] = num
             
-    def generate_hard_puzzle(self):
-        (clues,backtrack) = self.generate_puzzle()
-        while clues > 23:
-            (clues,backtrack) = self.generate_puzzle()
-        
-    def distribution_num_clues(self):
-        while True:
-            (clues,backtrack) = self.generate_puzzle()
-            print(clues)
+        self.history = History(self.grid) 
+        self.visited = []
+        self.stuck = False
         
     def generate_puzzle(self):
         self.generate_full_grid()
@@ -95,18 +103,14 @@ class Sudoku:
             else:
                 if not self.is_valid():
                     raise RuntimeError('grid is invalid')
+                    
+        self.history = History(self.grid) 
         
     def puzzle_level(self):
         # number of clues
         num_clues = len([i for i in self.grid if i != 0])
         
-        # number of backtracking required
-        original_grid = self.grid[:]
-        self.solve_backtrack()
-        num_backtrack = len([1 for r,c,n,b in self.history if b])
-        self.grid = original_grid
-        
-        return (num_clues,num_backtrack)
+        return num_clues
         
     def export_grid(self,filename):
         """export grid as svg"""
@@ -126,34 +130,50 @@ class Sudoku:
             return False
         else:
             return True
-    
-    def solve_backtrack_unique(self):
-        self.solve_grid()
-        idx = [i for i,v in enumerate(self.grid) if v==0]
-        sol = []
-        original_grid = self.grid[:]
-        for i in idx:
-            self.grid = original_grid
-            (r,c) = self.ind2sub(i)
-            self.backtrack(r,c)
-            if self.stuck: # invalid grid
-                self.unique = False
-            if self.complete():
-                if len(sol)==0:
-                    sol = self.grid[:]
-                else:
-                    if not self.cmp_grid(sol):
-                        self.unique = False
-            else:
-                self.solve_backtrack_unique()
             
-    def solve_backtrack(self):
-        self.solve_grid()
-        while not self.complete() and not self.stuck:
-            # select the first cell that is the least ambiguous
-            (r,c) = self.get_most_constrained()
-            self.backtrack(r,c)
-    
+    def next_move(self, node):
+        (r,c,candidates) = self.get_most_constrained()
+        for num in candidates:
+            grid = self.grid[:]
+            idx = self.sub2ind(r,c)
+            grid[idx] = num
+            child = History(grid)
+            node.add_child(child)
+        
+    def solve(self):
+        '''Use DFS to visit the tree of possible moves'''
+        
+        solution = []
+        unique = True
+        stack = []
+        root = self.history
+        self.next_move(root)
+        stack.append(root)
+        
+        while len(stack)>0:
+            node = stack.pop()
+            if node not in self.visited:
+                self.grid = node.grid[:]
+                self.next_move(node)
+                self.visited.append(node)
+                for c in node.children:
+                    stack.append(c)
+                
+                # check if we have solved the puzzle
+                if self.complete():
+                    if solution == []:
+                        solution = self.grid[:]
+                    else:
+                        if not self.cmp_grid(solution):
+                            unique = False
+                            break
+        
+        self.grid = solution
+        if self.complete() and unique:
+            return True
+        else:
+            return False
+                    
     def get_most_constrained(self):
         least_num_choice = 10
         r_sel = 0
@@ -167,53 +187,15 @@ class Sudoku:
                     least_num_choice = num_choice
                     r_sel = r
                     c_sel = c
+                    candidates_sel = candidates
     
-        return (r_sel,c_sel)
+        return (r_sel,c_sel,candidates_sel)
             
     def cmp_grid(self, grid):
         for i in range(0,81):
             if self.grid[i] != grid[i]:
                 return False
         return True 
-                
-    def backtrack(self,r,c):
-        candidates = self.get_uniq_candidate(r,c)
-        
-        # try the alternatives
-        for n in candidates:
-            self.add_num(r,c,n,True)
-            self.track.append(len(self.history))
-            self.num_backtrack = self.num_backtrack + 1
-            self.solve_grid()
-            # backtrack if we get stuck
-            if self.stuck:
-                if n == candidates[-1]: # everything failed, we have an invalid grid
-                    break
-                for step in range(self.track[-1],len(self.history)):
-                    r,c,n,b = self.history[step]
-                    self.add_num(r,c,0,False)
-                self.track.pop()
-                self.stuck = False
-            else:
-                break
-                
-    def solve_grid(self):
-        while True:
-            num_found_beg = len(self.history)
-           
-            for r in range(0,9):
-                for c in range(0,9):
-                    self.solve_cell(r,c)
-            
-            # if no change, stop
-            num_found_end =  len(self.history)
-            if num_found_end == num_found_beg:
-                break
-        
-    def add_num(self,r,c,n,b):
-        idx = self.sub2ind(r,c)
-        self.grid[idx] = n
-        self.history.append((r,c,n,b))
     
     def get_marginal(self,idx,r,c):
         uniq_other_candidates = set()
@@ -226,11 +208,6 @@ class Sudoku:
         this_candidates = set(self.get_candidate(r,c))
         candidate = list(this_candidates - uniq_other_candidates)
         return candidate
-    
-    def solve_cell(self,r,c):
-        candidate = self.get_uniq_candidate(r,c)
-        if len(candidate)==1:
-            self.add_num(r,c,candidate[0],False)
     
     def get_uniq_candidate(self,r,c):
         candidate = self.get_candidate(r,c)
@@ -250,7 +227,8 @@ class Sudoku:
             return candidate
     
     def get_candidate(self,r,c):
-        if self.grid[9*r+c] == 0:
+        idx = self.sub2ind(r,c)
+        if self.grid[idx] == 0:
             row = self.get_row(r)
             col = self.get_col(c)
             sqr = self.get_square(r,c)
@@ -343,13 +321,7 @@ class Sudoku:
         print(self.grid_string())
         
     def __repr__(self):
-        repr_str = "Grid: \n" + self.grid_string() + "\nHistory: \n"
-        for r,c,n,b in self.history:
-            if b:
-                hist = "{0},{1}: {2} *\n".format(r,c,n)
-            else:
-                hist = "{0},{1}: {2}\n".format(r,c,n)
-            repr_str = repr_str + hist
+        repr_str = "Grid: \n" + self.grid_string()
         return repr_str
 
 
