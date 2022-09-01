@@ -12,6 +12,15 @@ class Tree:
     
     def add_child(self, node):
         self.children.append(node)
+        
+    def num_branches(self):
+        n = 0
+        n_children = len(self.children)
+        if n_children > 1:
+            n += len(self.children)-1
+        for c in self.children:
+            n += c.num_branches()
+        return n
     
     def __repr__(self):
         if self.solution:
@@ -21,9 +30,9 @@ class Tree:
             
         for i in self.grid:
             if i==0:
-                reprstr += "\033[91m" + str(i) + "\033[0m"
+                reprstr += "\033[91m" + "0" + "\033[0m"
             else:
-                reprstr += str(i)
+                reprstr += chr(48+i)
             
         if self.solution:
             reprstr += '\033[0m'
@@ -31,14 +40,13 @@ class Tree:
         reprstr += "\n"
         return reprstr
 
-# TODO fix problems with multiple digits for Sudoku(4) and beyond
-# for reading, writing and displaying grids
-
 # TODO check for symmetries
 
 class Sudoku:
     
     def __init__(self, n=3):
+        if not 2 <= n <= 4:
+            raise(ValueError)
         self.tot_size = n**4
         self.max_num = n**2
         self.n = n
@@ -85,7 +93,15 @@ class Sudoku:
         # number of clues
         num_clues = len([i for i in self.grid if i != 0])
         
-        # structure of the tree : check visited
+        # structure of the tree 
+        grid = self.grid[:]
+        self.visited = []
+        self.tree = Tree(self.grid)
+        self.solve() 
+        num_branches = sdk.tree.num_branches()
+        self.grid = grid
+        self.visited = []
+        self.tree = Tree(self.grid)
         
         return num_clues
         
@@ -104,9 +120,6 @@ class Sudoku:
                 counter = counter+1
             if counter != self.tot_size:
                 raise RuntimeError('wrong grid format')
-            else:
-                if not self.valid():
-                    raise RuntimeError('grid is invalid')
                     
         self.tree = Tree(self.grid) 
         
@@ -120,14 +133,18 @@ class Sudoku:
                     
     def export_grid(self,filename):
         """export grid as svg""" 
-        svgstring = "<svg height='90' width='90'>\n"
+        svgstring = "<svg height='"
+        svgstring += str(10*self.max_num)
+        svgstring += "' width='"
+        svgstring += str(10*self.max_num)
+        svgstring += "'>\n"
         
         # add background
         svgstring += "<rect width='100%' height='100%' fill='white'/>\n"
         
         # add nums
-        for r in range(0,9):
-            for c in range(0,9):
+        for r in range(0,self.max_num):
+            for c in range(0,self.max_num):
                 idx = self.sub2ind(r,c)
                 num = self.grid[idx]
                 #TODO fontsize
@@ -137,17 +154,17 @@ class Sudoku:
                     svgstring += "<text" 
                     svgstring += " x='" + str(posx) +"'"
                     svgstring += " y='" + str(posy) +"'>"
-                    svgstring += str(num)
-                    svgstring += " font-size=''"
+                    svgstring += chr(48+num)
+                    #svgstring += " font-size=''"
                     svgstring += "</text>\n"
         
         # add rows
-        for r in range(0,10):
+        for r in range(0,self.max_num+1):
             x1 = 0
             y1 = r*10
-            x2 = 90
+            x2 = 10*self.max_num
             y2 = r*10
-            if r == 3 or r == 6:
+            if r%self.n == 0:
                 lw = 1
             else:
                 lw = .5
@@ -160,12 +177,12 @@ class Sudoku:
             svgstring += "/>\n"
         
         # add columns    
-        for c in range(0,10):
+        for c in range(0,self.max_num+1):
             x1 = c*10
             y1 = 0
             x2 = c*10
-            y2 = 90
-            if c == 3 or c == 6:
+            y2 = 10*self.max_num
+            if c%self.n == 0:
                 lw = 1
             else:
                 lw = .5
@@ -181,11 +198,11 @@ class Sudoku:
         with open(filename,'w') as fout:
             fout.write(svgstring)
         
-    def generate_full_grid(self):
+    def generate_full_grid(self,display=False):
         '''Use DFS to generate grid from an empty grid'''
         
         def grow_tree():
-            (r,c,candidates) = self.get_most_constrained()
+            (r,c,candidates) = self.get_most_constrained_random()
             for num in candidates:
                 grid = self.grid[:]
                 idx = self.sub2ind(r,c)
@@ -207,6 +224,9 @@ class Sudoku:
                 self.visited.append(node)
                 for c in node.children:
                     stack.append(c)
+                    
+                if display:
+                    print(node, end='')
                     
                 if self.complete():
                     break
@@ -259,6 +279,27 @@ class Sudoku:
         else:
             return False
         
+    def get_most_constrained_random(self):
+        moves = []
+        unknown = [i for i,v in enumerate(self.grid) if v == 0]
+        for idx in unknown:
+            (r,c) = self.ind2sub(idx)
+            candidates = self.get_uniq_candidate(r,c)
+            num_choice = len(candidates)
+            moves.append((r,c,candidates))
+    
+        # select most constrained moves
+        num_choice = [len(cand) for r,c,cand in moves]
+        selected_moves = [(r,c,cand) for r,c,cand in moves if len(cand)==min(num_choice)]
+        num_selected_moves = len(selected_moves)
+        
+        # get a random move
+        if num_selected_moves>0:
+            idx = random.randrange(0,num_selected_moves)
+            return selected_moves[idx]
+        else:
+            return (0,0,[])
+        
     def get_most_constrained(self):
         least_num_choice = self.max_num+1
         r_sel = 0
@@ -297,14 +338,14 @@ class Sudoku:
     
     def get_uniq_candidate(self,r,c):
         candidate = self.get_candidate(r,c)
-        isqr = self.sqr_ind(r,c)
+        ibox = self.box_ind(r,c)
         irow = self.row_ind(r)
         icol = self.col_ind(c)
-        uniq_sqr = self.get_marginal(isqr,r,c)
+        uniq_box = self.get_marginal(ibox,r,c)
         uniq_row = self.get_marginal(irow,r,c)
         uniq_col = self.get_marginal(icol,r,c)
-        if len(uniq_sqr)==1:
-            return uniq_sqr
+        if len(uniq_box)==1:
+            return uniq_box
         elif len(uniq_row)==1:
             return uniq_row
         elif len(uniq_col)==1:
@@ -317,8 +358,8 @@ class Sudoku:
         if self.grid[idx] == 0:
             row = self.get_row(r)
             col = self.get_col(c)
-            sqr = self.get_square(r,c)
-            not_candidate = set(row+col+sqr)
+            box = self.get_box(r,c)
+            not_candidate = set(row+col+box)
             possible = {i for i in range(1,self.max_num+1)}
             candidate = list(possible - not_candidate)
             return candidate
@@ -340,7 +381,7 @@ class Sudoku:
     def col_ind(self,c):
         return [i for i in range(0,self.tot_size) if i%self.max_num==c]
     
-    def sqr_ind(self,r,c):
+    def box_ind(self,r,c):
         return [i for i in range(0,self.tot_size) 
             if (i//self.max_num)//self.n==r//self.n 
             and (i%self.max_num)//self.n==c//self.n]
@@ -351,35 +392,8 @@ class Sudoku:
     def get_col(self,c):
         return [self.grid[i] for i in self.col_ind(c)]
     
-    def get_square(self,r,c):
-        return [self.grid[i] for i in self.sqr_ind(r,c)]
-    
-    def valid_subset(self,numbers):
-        seen = set()
-        dupes = [x for x in numbers if x in seen and x != 0 or seen.add(x)]
-        if len(dupes)>0:
-            return False
-        else:
-            return True
-        
-    def valid(self):
-        # check rows
-        for r in range(0,self.max_num):
-            numbers = self.get_row(r)
-            if not self.valid_subset(numbers):
-                return False
-        # check columns
-        for c in range(0,self.max_num):
-            numbers = self.get_col(c)
-            if not self.valid_subset(numbers):
-                return False
-        # check squares
-        for r in range(0,self.max_num,self.n):
-            for c in range(0,self.max_num,self.n):
-                numbers = self.get_square(r,c)
-                if not self.valid_subset(numbers):
-                    return False
-        return True
+    def get_box(self,r,c):
+        return [self.grid[i] for i in self.box_ind(r,c)]
         
     def complete(self):
         if 0 in self.grid:
@@ -397,7 +411,7 @@ class Sudoku:
                 if self.grid[idx] == 0:
                     gridstr = gridstr + "  "
                 else:
-                    gridstr = gridstr + str(self.grid[idx]) + " "
+                    gridstr = gridstr + chr(48+self.grid[idx]) + " "
                 if (c+1)//self.n > c//self.n:
                     if c == self.max_num-1:
                         gridstr = gridstr + " \n"
