@@ -108,18 +108,14 @@ class Sudoku:
     def read_grid(self,filename):
         self.reset_grid()
         with open(filename,'r') as fin:
-            counter = 0
-            while True:
+            for char in range(0,self.tot_size):
                 n = fin.read(1)
                 if n == '\n':
                     break
                 if n == ' ':
-                    self.grid[counter] = 0
+                    self.grid[char] = 0
                 else:
-                    self.grid[counter] = int(n)
-                counter = counter+1
-            if counter != self.tot_size:
-                raise RuntimeError('wrong grid format')
+                    self.grid[char] = ord(n)-48
                     
         self.tree = Tree(self.grid) 
         
@@ -129,14 +125,14 @@ class Sudoku:
                 if num == 0:
                     fout.write(' ')
                 else:
-                    fout.write(num)
+                    fout.write(chr(48+num))
                     
-    def export_grid(self,filename):
+    def export_grid(self,filename,cell_size=20):
         """export grid as svg""" 
         svgstring = "<svg height='"
-        svgstring += str(10*self.max_num)
+        svgstring += str(cell_size*self.max_num)
         svgstring += "' width='"
-        svgstring += str(10*self.max_num)
+        svgstring += str(cell_size*self.max_num)
         svgstring += "'>\n"
         
         # add background
@@ -148,22 +144,28 @@ class Sudoku:
                 idx = self.sub2ind(r,c)
                 num = self.grid[idx]
                 #TODO fontsize
-                posx = c*10+2
-                posy = r*10+9
+                posx = c*cell_size+2.8/10*cell_size
+                posy = r*cell_size+7.8/10*cell_size
                 if num > 0:
                     svgstring += "<text" 
+                    svgstring += " font-size='" + str(cell_size*72/96) + "'"
+                    svgstring += " font-family='monospace'"
                     svgstring += " x='" + str(posx) +"'"
                     svgstring += " y='" + str(posy) +"'>"
-                    svgstring += chr(48+num)
-                    #svgstring += " font-size=''"
+                    if num == 12:
+                        svgstring += "&lt;"
+                    elif num == 14:
+                        svgstring += "&gt;"
+                    else:
+                        svgstring += chr(48+num)
                     svgstring += "</text>\n"
         
         # add rows
         for r in range(0,self.max_num+1):
             x1 = 0
-            y1 = r*10
-            x2 = 10*self.max_num
-            y2 = r*10
+            y1 = r*cell_size
+            x2 = cell_size*self.max_num
+            y2 = r*cell_size
             if r%self.n == 0:
                 lw = 1
             else:
@@ -178,10 +180,10 @@ class Sudoku:
         
         # add columns    
         for c in range(0,self.max_num+1):
-            x1 = c*10
+            x1 = c*cell_size
             y1 = 0
-            x2 = c*10
-            y2 = 10*self.max_num
+            x2 = c*cell_size
+            y2 = cell_size*self.max_num
             if c%self.n == 0:
                 lw = 1
             else:
@@ -202,7 +204,7 @@ class Sudoku:
         '''Use DFS to generate grid from an empty grid'''
         
         def grow_tree():
-            (r,c,candidates) = self.get_most_constrained_random()
+            (r,c,candidates) = self.get_most_constrained()
             for num in candidates:
                 grid = self.grid[:]
                 idx = self.sub2ind(r,c)
@@ -279,7 +281,7 @@ class Sudoku:
         else:
             return False
         
-    def get_most_constrained_random(self):
+    def get_most_constrained(self):
         moves = []
         unknown = [i for i,v in enumerate(self.grid) if v == 0]
         for idx in unknown:
@@ -299,24 +301,6 @@ class Sudoku:
             return selected_moves[idx]
         else:
             return (0,0,[])
-        
-    def get_most_constrained(self):
-        least_num_choice = self.max_num+1
-        r_sel = 0
-        c_sel = 0
-        candidates_sel = []
-        unknown = [i for i,v in enumerate(self.grid) if v == 0]
-        for idx in unknown:
-            (r,c) = self.ind2sub(idx)
-            candidates = self.get_uniq_candidate(r,c)
-            num_choice = len(candidates)
-            if num_choice > 0 and num_choice < least_num_choice:
-                least_num_choice = num_choice
-                r_sel = r
-                c_sel = c
-                candidates_sel = candidates
-    
-        return (r_sel,c_sel,candidates_sel)
             
     def cmp_grid(self, grid):
         for i in range(0,self.tot_size):
