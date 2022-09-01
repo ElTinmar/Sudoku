@@ -62,7 +62,7 @@ class Sudoku:
             self.grid[i] = 0
         self.tree = Tree(self.grid)
         
-    def prune_grid(self): 
+    def prune_grid(self,display=False): 
         solution = self.grid[:]
         not_prunable = set()
         while True:
@@ -80,6 +80,8 @@ class Sudoku:
                     self.grid[idx] = prev_num
                 self.grid = previous_grid
                 self.tree = Tree(self.grid)
+                if display:
+                    print(self.tree, end='')
             else:
                 break
         self.visited = []
@@ -287,7 +289,6 @@ class Sudoku:
         for idx in unknown:
             (r,c) = self.ind2sub(idx)
             candidates = self.get_uniq_candidate(r,c)
-            num_choice = len(candidates)
             moves.append((r,c,candidates))
     
         # select most constrained moves
@@ -321,6 +322,12 @@ class Sudoku:
         return candidate
     
     def get_uniq_candidate(self,r,c):
+        # if only k same num in k cells, in a row/col/box they are fixed
+        
+        # TODO https://youtu.be/jU_W53M5aMQ?t=150
+        # TODO https://youtu.be/jU_W53M5aMQ?t=204
+        # TODO https://youtu.be/jU_W53M5aMQ?t=225
+        
         candidate = self.get_candidate(r,c)
         ibox = self.box_ind(r,c)
         irow = self.row_ind(r)
