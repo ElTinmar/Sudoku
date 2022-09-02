@@ -92,6 +92,8 @@ class Sudoku:
         return self.puzzle_level()
         
     def puzzle_level(self):
+        # check https://www.nature.com/articles/srep00725
+        
         # number of clues
         num_clues = len([i for i in self.grid if i != 0])
         
@@ -106,8 +108,42 @@ class Sudoku:
         self.tree = Tree(self.grid)
         
         return num_clues
-        
-    def read_grid(self,filename):
+    
+    def read_grid(self, gridstr):
+        self.reset_grid()
+        for char in range(0,self.tot_size):
+            n = gridstr[char]
+            if n == '\n':
+                break
+            if n == ' ':
+                self.grid[char] = 0
+            else:
+                self.grid[char] = ord(n)-48
+                    
+        self.tree = Tree(self.grid) 
+    
+    def write_grid(self):
+        gridstr = "\n"
+        for r in range(0,self.max_num):
+            for c in range(0,self.max_num):
+                idx  = self.sub2ind(r,c)
+                if c == 0:
+                    gridstr = gridstr + " "
+                if self.grid[idx] == 0:
+                    gridstr = gridstr + "  "
+                else:
+                    gridstr = gridstr + chr(48+self.grid[idx]) + " "
+                if (c+1)//self.n > c//self.n:
+                    if c == self.max_num-1:
+                        gridstr = gridstr + " \n"
+                        if (r+1)//self.n > r//self.n:
+                            if r != self.max_num-1:
+                                gridstr=gridstr+(self.n*(self.n+1)*2-1)*"-"+"\n"
+                    else:
+                        gridstr = gridstr + "| "
+        return gridstr 
+                
+    def load_grid(self,filename):
         self.reset_grid()
         with open(filename,'r') as fin:
             for char in range(0,self.tot_size):
@@ -121,7 +157,7 @@ class Sudoku:
                     
         self.tree = Tree(self.grid) 
         
-    def write_grid(self,filename):
+    def save_grid(self,filename):
         with open(filename,'w') as fout:
             for num in self.grid:
                 if num == 0:
@@ -357,6 +393,55 @@ class Sudoku:
         else:
             return []
     
+    def reduction_rules(self,r,c,uniqueness=False):
+        pass
+        # check https://www.sudokuwiki.org/Getting_Started
+        #
+        # we call row/col/box a reduction unit
+        
+        # if a number is a candidate only in one cell in a reduction unit, then it takes that value
+        # if two numbers are candidates only in two cells in a reduction unit, then those two cells can only take those two values
+        # if k numbers are candidates only in k cells in a reduction unit, then those k cells can only take those k values
+        
+        # ideas to implement this:
+        #   - with k=1 no problem, you can just update the grid 
+        #   - a flag to state that the candidates are fixed so that it can be leveraged somewhere else in the grid
+        #   - in general you can leverage that information if the k-uplet is "aligned" along one other reduction unit:
+        #   aligned means the k-uplet is entirely contained in the reduction unit
+        #   - as soon as fixed cell are identified, propagate this finding to the other two reduction units for each
+        #   of the concerned cells (maybe a general list for each row/col/box)
+        #   - when looking at each cell in a reduction unit, check if there are k-uplets
+        #   - store a "pencil mark" list for each cell
+        #   - maintain a global list of candidates and update it each time a number is added
+        
+        # uniqueness arguments: if the solution is unique, this puts a constraint on the numbers that can be used to guess
+        # numbers. This should be an option because we cannot always assume the grid is well-posed 
+        # how it works:
+        # In the following grid 1 and 2 can be swapped and produce a valid grid.
+        # For a solution to be unique, one of those 4 numbers should be a given
+        #
+        #         1 2   |       |        
+        #               |       |        
+        #               |       |        
+        #        -----------------------
+        #         2 1   |       |        
+        #               |       |        
+        #               |       |        
+        #        -----------------------
+        #               |       |        
+        #               |       |        
+        #               |       |   
+        #    
+        # Remark: this can be used to steer a backtracking attempt. This way it
+        # is likely to speed up the process, but we can still land on our feet
+        # if the puzzle is ill-posed. This is not as powerful as using uniqueness
+        # to reduce the puzzle however
+        # https://youtu.be/jU_W53M5aMQ?t=424
+        
+    def get_reduced_candidates(self,r,c,uniqueness=False):
+        # apply reduction rules and return reduced candidates
+        pass
+        
     def ind2sub(self,i):
         row = i//self.max_num
         col = i%self.max_num
@@ -393,23 +478,6 @@ class Sudoku:
             return True
             
     def __repr__(self):
-        gridstr = "\n"
-        for r in range(0,self.max_num):
-            for c in range(0,self.max_num):
-                idx  = self.sub2ind(r,c)
-                if c == 0:
-                    gridstr = gridstr + " "
-                if self.grid[idx] == 0:
-                    gridstr = gridstr + "  "
-                else:
-                    gridstr = gridstr + chr(48+self.grid[idx]) + " "
-                if (c+1)//self.n > c//self.n:
-                    if c == self.max_num-1:
-                        gridstr = gridstr + " \n"
-                        if (r+1)//self.n > r//self.n:
-                            if r != self.max_num-1:
-                                gridstr=gridstr+(self.n*(self.n+1)*2-1)*"-"+"\n"
-                    else:
-                        gridstr = gridstr + "| "
-        return gridstr
+        return self.write_grid()
+        
 
